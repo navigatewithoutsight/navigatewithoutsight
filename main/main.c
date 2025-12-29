@@ -14,6 +14,7 @@
 #if CONFIG_MODULE_ALL
 #include "gy87.h"
 #include "tof.h"
+#include "real_main.h"
 #endif
 
 void app_main() {
@@ -25,10 +26,9 @@ void app_main() {
 #elif CONFIG_VL53L7CX_ENABLE
   printf("- TOF module enabled\n");
   tof_main();
-  return;
 #elif CONFIG_MODULE_ALL
   printf("- All modules enabled\n");
-  // init_all_modules();
+  all_modules_main();
 #endif
 
 #if CONFIG_DEBUG_OUTPUT
