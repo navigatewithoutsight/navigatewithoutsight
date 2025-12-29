@@ -1,0 +1,33 @@
+# Automatic build files
+build/
+sdkconfig
+sdkconfig.old
+
+# Personal IDE settings
+.vscode/
+.idea/
+*.swp
+*~
+.cache/
+.clangd
+
+# tmp files
+*.bak
+*.log
+
+# System
+.DS_Store           # Mac
+Thumbs.db           # Windows
+
+# ESP-IDF ecosystem
+managed_components/
+dependencies.lock   # component manager
+
+# bins
+*.bin
+*.elf
+*.map
+
+# External drivers/libs
+vl53l7cx_official_driver/
+

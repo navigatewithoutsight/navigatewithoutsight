@@ -1,0 +1,32 @@
+# nws/Kconfig.projbuild
+menu "Module Configuration"
+    choice MODULE_SELECT
+        prompt "Select module to run"
+        default MODULE_GY87
+        help
+            Choose which module to include in the build.
+
+        config MODULE_GY87
+            bool "GY87 Module (IMU)"
+
+        config VL53L7CX_ENABLE
+            bool "Enable VL53L7CX ToF sensor"
+            default n
+            help
+                Enable VL53L7CX Time-of-Flight multi-zone sensor.
+
+        if VL53L7CX_ENABLE
+            rsource "tof/Kconfig"
+        endif
+                config MODULE_ALL
+            bool "All Modules (Integration)"
+    endchoice
+
+    config DEBUG_OUTPUT
+        bool "Enable debug output"
+        default y
+        help
+            Print debug messages to UART
+
+endmenu
+

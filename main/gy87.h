@@ -9,6 +9,7 @@ typedef enum {
 } turn_direction_t;
 
 // function declare
+void gy87_main(void);
 int GY87_init(void);
 int GY87_read_gyro_z(float *gyro_z);
 turn_direction_t GY87_detect_turn(float gyro_z);

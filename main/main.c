@@ -1,28 +1,38 @@
-#include "gy87.h" 
-#include "freertos/FreeRTOS.h" 
-#include "freertos/task.h" 
-#include "esp_log.h" 
- 
-#define TAG "MAIN" 
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "gy87.h"
 
-// ESP's entry point, called automatically after bootloader run and FreeRTOS scheduler runs
-void app_main(void) { 
-    GY87_init(); // call initialization function (configure I2C, install I2C, wake up MPU)
- 
-    float gz; // store z-axis degree/sec readings, updates each loop
-    while (1) { 
-        GY87_read_gyro_z(&gz); 
-        turn_direction_t dir = GY87_detect_turn(gz); // classify rotation based on threshold
-        // converts a continuous value (gz) into a discrete state (left, right, none)
- 
-        if (dir == TURN_LEFT) 
-            ESP_LOGI(TAG, "Turning LEFT (%.2f °/s)", gz); 
-        else if (dir == TURN_RIGHT) 
-            ESP_LOGI(TAG, "Turning RIGHT (%.2f °/s)", gz); 
-        else 
-            ESP_LOGI(TAG, "No turn (%.2f °/s)", gz); 
- 
-        // pause loop for 0.1 seconds 
-        vTaskDelay(pdMS_TO_TICKS(100)); 
-    } 
-} 
+#include "sdkconfig.h"
+#include "stdio.h"
+#if CONFIG_VL53L7CX_ENABLE
+#include "tof.h"
+#endif
+#if CONFIG_VL53L7CX_ENABLE
+#include "gy87.h"
+#endif
+#if CONFIG_MODULE_ALL
+#include "gy87.h"
+#include "tof.h"
+#endif
+
+void app_main() {
+  printf("Build configuration:\n");
+
+#if CONFIG_MODULE_GY87
+  printf("- GY87 module enabled\n");
+  gy87_main();
+#elif CONFIG_VL53L7CX_ENABLE
+  printf("- TOF module enabled\n");
+  tof_main();
+  return;
+#elif CONFIG_MODULE_ALL
+  printf("- All modules enabled\n");
+  // init_all_modules();
+#endif
+
+#if CONFIG_DEBUG_OUTPUT
+  printf("Debug output enabled\n");
+#endif
+}
+

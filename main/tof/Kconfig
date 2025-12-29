@@ -1,0 +1,58 @@
+menu "VL53L7CX Configuration"
+    depends on VL53L7CX_ENABLE
+
+    config VL53L7CX_I2C_PORT_NUM
+        int "I2C port number"
+        range 0 1
+        default 0
+        help
+            I2C port (0 or 1) for VL53L7CX communication.
+
+    config VL53L7CX_I2C_ADDRESS
+        hex "I2C address"
+        range 0x10 0x77
+        default 0x29
+        help
+            I2C address of VL53L7CX sensor. Default is 0x29.
+
+    config VL53L7CX_XSHUT_GPIO
+        int "XSHUT GPIO pin"
+        range 0 39
+        default 4
+        help
+            GPIO pin connected to XSHUT (shutdown) pin.
+
+    config VL53L7CX_LPN_GPIO
+        int "LP_N GPIO pin"
+        range 0 39
+        default 5
+        help
+            GPIO pin connected to LP_N (low power) pin.
+
+    choice VL53L7CX_RESOLUTION
+        prompt "Resolution"
+        default VL53L7CX_RES_8X8
+        help
+            Sensor resolution (number of zones).
+
+        config VL53L7CX_RES_4X4
+            bool "4x4 (16 zones)"
+            
+        config VL53L7CX_RES_8X8
+            bool "8x8 (64 zones)"
+    endchoice
+
+    config VL53L7CX_RANGING_FREQ_HZ
+        int "Ranging frequency (Hz)"
+        range 1 60
+        default 15
+        help
+            Measurement frequency in Hz.
+
+    config VL53L7CX_DEBUG
+        bool "Enable debug output"
+        default n
+        help
+            Enable debug messages over UART.
+endmenu
+
