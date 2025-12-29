@@ -385,6 +385,15 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# Module Configuration
+#
+CONFIG_MODULE_GY87=y
+# CONFIG_VL53L7CX_ENABLE is not set
+# CONFIG_MODULE_ALL is not set
+CONFIG_DEBUG_OUTPUT=y
+# end of Module Configuration
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y
@@ -1790,6 +1799,12 @@ CONFIG_WIFI_PROV_AUTOSTOP_TIMEOUT=30
 CONFIG_WIFI_PROV_STA_ALL_CHANNEL_SCAN=y
 # CONFIG_WIFI_PROV_STA_FAST_SCAN is not set
 # end of Wi-Fi Provisioning Manager
+
+#
+# VL53L1X
+#
+# CONFIG_VL53L1X_DEBUG is not set
+# end of VL53L1X
 # end of Component config
 
 # CONFIG_IDF_EXPERIMENTAL_FEATURES is not set
