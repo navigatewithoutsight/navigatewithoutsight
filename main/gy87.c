@@ -43,6 +43,24 @@ void gy87_main(void) {
   }
 }
 
+void gy87_loop_iteration(float *gz) {
+      GY87_read_gyro_z(gz);
+    turn_direction_t dir =
+        GY87_detect_turn(*gz); // classify rotation based on threshold
+    // converts a continuous value (gz) into a discrete state (left, right,
+    // none)
+
+    if (dir == TURN_LEFT)
+      ESP_LOGI(TAG, "Turning LEFT (%.2f °/s)", *gz);
+    else if (dir == TURN_RIGHT)
+      ESP_LOGI(TAG, "Turning RIGHT (%.2f °/s)", *gz);
+    else
+      ESP_LOGI(TAG, "No turn (%.2f °/s)", *gz);
+
+    // pause loop for 0.1 seconds
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+}
 
 // configuration of ESP's I2C hardware
 // installation of the I2C driver
@@ -75,6 +93,19 @@ int GY87_init(void) {
     ESP_LOGI(TAG, "GY-87 initialized");
     return 0;
 }
+int GY87_init_no_i2c_bus(void) {
+    uint8_t wake_cmd[2] = {MPU6050_RA_PWR_MGMT_1, 0x00};
+    // byte 0 - register address (0x6B)
+    // BYTE 1 - VALUE TO WRITE (0X00)
+    esp_err_t err = i2c_master_write_to_device(I2C_PORT, MPU6050_ADDR, wake_cmd, 2, 1000 / portTICK_PERIOD_MS);
+    if (err != ESP_OK) return -3;
+    // ESP sends start, sends devide address 0x68 + WRITE, sends 0x6B, 0x00, sends STOP
+    // result -> MPU exits sleep mode
+
+    ESP_LOGI(TAG, "GY-87 initialized");
+    return 0;
+}
+
 
 // reads the current z-axis rotation rate
 int GY87_read_gyro_z(float *gyro_z) {
