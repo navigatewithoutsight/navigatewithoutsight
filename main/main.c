@@ -1,7 +1,7 @@
-#include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "gy87.h"
+// #include "esp_log.h"
+// #include "freertos/FreeRTOS.h"
+// #include "freertos/task.h"
+// #include "gy87.h"
 
 #include "sdkconfig.h"
 #include "stdio.h"
@@ -12,8 +12,6 @@
 #include "gy87.h"
 #endif
 #if CONFIG_MODULE_ALL
-#include "gy87.h"
-#include "tof.h"
 #include "real_main.h"
 #endif
 
@@ -35,4 +33,3 @@ void app_main() {
   printf("Debug output enabled\n");
 #endif
 }
-
