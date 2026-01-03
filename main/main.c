@@ -8,7 +8,7 @@
 #if CONFIG_VL53L7CX_ENABLE
 #include "tof.h"
 #endif
-#if CONFIG_VL53L7CX_ENABLE
+#if CONFIG_MODULE_GY87
 #include "gy87.h"
 #endif
 #if CONFIG_MODULE_ALL
