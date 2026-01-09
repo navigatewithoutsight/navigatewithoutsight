@@ -5,6 +5,8 @@
 #include "vl53l1x.h"
 #include "ssd1306_simple.h"
 #include <time.h>
+#include "buzzer.h"
+
 static const char *ALL_MODULES_MAIN = "TOF";
 
 void all_modules_main() {
@@ -29,11 +31,18 @@ void all_modules_main() {
 
   ESP_LOGI(ALL_MODULES_MAIN, "Init phase passed...");
   ssd1306_init();
+  buzzer_init();
+  buzzer_set_mode_event(1); // startup beep 
+
   float gz; // store z-axis degree/sec readings, updates each loop
   while (1) {
   ESP_LOGI(ALL_MODULES_MAIN, "Iteration starts...");
     gy87_loop_iteration(&gz);
     tof_loop_iteration(dev);
+    /*// Testing: cahnge with real distance from ToF 
+    buzzer_set_distance_cm(999, 1);  // 999cm = far away, valid reading
+    buzzer_set_error(0);            // no error for now
+*/
     ssd1306_render_dashboard(
     0,      // turn_dir (LEFT / RIGHT / NONE) → placeholder
     0,      // turn_deg
@@ -42,7 +51,7 @@ void all_modules_main() {
     NULL,   // depth 
     0
 );
-
+  buzzer_iteration();
   ESP_LOGI(ALL_MODULES_MAIN, "Iteration ends...");
   }
 }
