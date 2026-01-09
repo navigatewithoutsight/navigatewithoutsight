@@ -197,6 +197,84 @@ void ssd1306_draw_text_xy(int x, int y, const char *text)
     }
 }
 
+
+static void draw_arrow(int cx, int cy, int dir)
+{
+    if (dir == 0) {
+        ssd1306_draw_hline(cx - 10, cx + 10, cy, 1);
+        return;
+    }
+
+    int sign = (dir > 0) ? 1 : -1;
+
+    // Shaft
+    ssd1306_draw_hline(cx - 12, cx + 12, cy, 1);
+
+    // Arrow head
+    for (int i = 0; i <= 6; i++) {
+        ssd1306_draw_pixel(cx + sign * (12 + i), cy, 1);
+        ssd1306_draw_pixel(cx + sign * (12 + i), cy - i, 1);
+        ssd1306_draw_pixel(cx + sign * (12 + i), cy + i, 1);
+    }
+}
+
+static void itoa_simple(int v, char *out, int out_sz)
+{
+    if (out_sz <= 0) return;
+
+    int n = 0;
+
+    if (v == 0) {
+        out[n++] = '0';
+        out[n] = 0;
+        return;
+    }
+
+    if (v < 0) {
+        out[n++] = '-';
+        v = -v;
+    }
+
+    char tmp[12];
+    int k = 0;
+
+    while (v > 0 && k < (int)sizeof(tmp)) {
+        tmp[k++] = '0' + (v % 10);
+        v /= 10;
+    }
+
+    while (k > 0 && n < out_sz - 1)
+        out[n++] = tmp[--k];
+
+    out[n] = 0;
+}
+
+
+static void format_speed_x100(int speed_x100, char *out, int out_sz)
+{
+    if (out_sz < 6) {
+        if (out_sz > 0) out[0] = 0;
+        return;
+    }
+
+    int whole = speed_x100 / 100;
+    int frac  = speed_x100 % 100;
+
+    char a[12];
+    itoa_simple(whole, a, sizeof(a));
+
+    int n = 0;
+    for (int i = 0; a[i] && n < out_sz - 1; i++)
+        out[n++] = a[i];
+
+    if (n < out_sz - 1) out[n++] = '.';
+    if (n < out_sz - 1) out[n++] = '0' + (frac / 10);
+    if (n < out_sz - 1) out[n++] = '0' + (frac % 10);
+
+    out[n] = 0;
+}
+
+
 /* ===================== DASHBOARD ===================== */
 
 void ssd1306_render_dashboard(int turn_dir,
