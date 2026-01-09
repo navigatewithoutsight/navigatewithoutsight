@@ -3,6 +3,7 @@
 #include "tof.h"
 #include "gy87.h"
 #include "vl53l1x.h"
+#include "ssd1306_simple.h"
 #include <time.h>
 static const char *ALL_MODULES_MAIN = "TOF";
 
@@ -27,11 +28,21 @@ void all_modules_main() {
   }
 
   ESP_LOGI(ALL_MODULES_MAIN, "Init phase passed...");
+  ssd1306_init();
   float gz; // store z-axis degree/sec readings, updates each loop
   while (1) {
   ESP_LOGI(ALL_MODULES_MAIN, "Iteration starts...");
     gy87_loop_iteration(&gz);
     tof_loop_iteration(dev);
+    ssd1306_render_dashboard(
+    0,      // turn_dir (LEFT / RIGHT / NONE) → placeholder
+    0,      // turn_deg
+    0,      // steps per minute
+    0,      // speed * 100
+    NULL,   // depth 
+    0
+);
+
   ESP_LOGI(ALL_MODULES_MAIN, "Iteration ends...");
   }
 }
