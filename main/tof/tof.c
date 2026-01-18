@@ -18,6 +18,33 @@
 
 static const char *TAG = "TOF";
 
+// Функция для диагностики датчика
+void vl53l1x_diagnostics(vl53l1x_t *v) {
+  // Прочитайте ключевые регистры
+  uint16_t model_id = vl53l1x_readReg16Bit(v, 0x010F);
+  uint8_t revision_id = vl53l1x_readReg(v, 0x0111);
+  uint8_t system_status = vl53l1x_readReg(v, 0x00E5);
+  uint8_t mode_status = vl53l1x_readReg(v, 0x00E6);
+
+  ESP_LOGI(TAG, "Diagnostics:");
+  ESP_LOGI(TAG, "  Model ID: 0x%04X (expected 0xEACC)", model_id);
+  ESP_LOGI(TAG, "  Revision ID: 0x%02X", revision_id);
+  ESP_LOGI(TAG, "  System Status: 0x%02X", system_status);
+  ESP_LOGI(TAG, "  Mode Status: 0x%02X", mode_status);
+
+  // Проверьте VCSEL периоды
+  uint8_t vcsel_period_a = vl53l1x_readReg(v, 0x0060);
+  uint8_t vcsel_period_b = vl53l1x_readReg(v, 0x0063);
+  ESP_LOGI(TAG, "  VCSEL Period A: 0x%02X", vcsel_period_a);
+  ESP_LOGI(TAG, "  VCSEL Period B: 0x%02X", vcsel_period_b);
+
+  // Проверьте таймауты
+  uint16_t timeout_a = vl53l1x_readReg16Bit(v, 0x005E);
+  uint16_t timeout_b = vl53l1x_readReg16Bit(v, 0x0061);
+  ESP_LOGI(TAG, "  Timeout A: 0x%04X", timeout_a);
+  ESP_LOGI(TAG, "  Timeout B: 0x%04X", timeout_b);
+}
+
 static void scan_i2c() {
   ESP_LOGI(TAG, "Starting I2C scan...");
 
