@@ -2,9 +2,10 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.3.1
+    version: 5.2.6
   vl53l1x_dep:
-    component_hash: 3c995ccc72663df5a465a969a5443f9e28ffbbe6d09679bcd63807a26078e30c
+    component_hash: 
+      3c995ccc72663df5a465a969a5443f9e28ffbbe6d09679bcd63807a26078e30c
     dependencies: []
     source:
       git: https://github.com/revk/ESP32-VL53L1X.git

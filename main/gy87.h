@@ -2,18 +2,19 @@
 #define GY87_H
 
 typedef enum {
-    // defines a new enumeration type, code more readable
-    TURN_NONE = 0,
-    TURN_LEFT,
-    TURN_RIGHT
+  // defines a new enumeration type, code more readable
+  TURN_NONE = 0,
+  TURN_LEFT,
+  TURN_RIGHT
 } turn_direction_t;
 
 // function declare
 void gy87_main(void);
 int GY87_init(void);
 int GY87_init_no_i2c_bus(void);
-void gy87_loop_iteration(float *gz) ;
+void gy87_loop_iteration(float *gz);
 int GY87_read_gyro_z(float *gyro_z);
 turn_direction_t GY87_detect_turn(float gyro_z);
+int GY87_init_no_i2c_bus(void);
 
 #endif

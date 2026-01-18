@@ -3,6 +3,7 @@
 
 // Active buzzer: ON/OFF only (simple beep).
 // Passive buzzer: used for secondary cues
+// Active is small, Passive is big
 
 #define ACTIVE_BUZZER_PIN 18 // ran pin
 #define PASSIVE_BUZZER_PIN 19

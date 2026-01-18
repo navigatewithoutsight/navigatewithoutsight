@@ -44,7 +44,6 @@ void vl53l1x_diagnostics(vl53l1x_t *v) {
   ESP_LOGI(TAG, "  Timeout A: 0x%04X", timeout_a);
   ESP_LOGI(TAG, "  Timeout B: 0x%04X", timeout_b);
 }
-
 static void scan_i2c() {
   ESP_LOGI(TAG, "Starting I2C scan...");
 
@@ -149,6 +148,7 @@ int tof_init(vl53l1x_t *dev) {
 
   /* ---- Single-shot ---- */
   ESP_LOGI(TAG, "Starting single-shot measurements...");
+  return 0;
 }
 
 int tof_loop_iteration(vl53l1x_t *dev) {
@@ -184,6 +184,7 @@ int tof_loop_iteration(vl53l1x_t *dev) {
     ESP_LOGI(TAG, "Status: Unknown (0x%02X)", raw_status);
     return -1;
   }
+  return 0;
 }
 
 int tof_main(void) {
@@ -203,6 +204,12 @@ int tof_main(void) {
   /* ---- Single-shot ---- */
   ESP_LOGI(TAG, "Starting single-shot measurements...");
 
-  while (1)
-    tof_loop_iteration(dev);
+  int res;
+  while (1) {
+    res = tof_loop_iteration(dev);
+    if (res <= 0) {
+      return -1;
+    }
+  }
+  return 0;
 }
