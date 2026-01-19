@@ -1,10 +1,10 @@
 #include "real_main.h"
 #include "buzzer.h"
 #include "esp_log.h"
+#include "freertos/idf_additions.h"
 #include "gy87.h"
 #include "ssd1306_simple.h"
 #include "tof.h"
-#include "vl53l1x.h"
 
 static const char *ALL_MODULES_MAIN = "TOF";
 
@@ -15,6 +15,7 @@ void all_modules_main() {
   // 3. loop
   vl53l1x_t *dev = NULL;
 
+  vTaskDelay(pdMS_TO_TICKS(400)); // Дать время на освобождение стека
   ESP_LOGI(ALL_MODULES_MAIN, "Start...");
   int err;
   err = tof_init(dev);

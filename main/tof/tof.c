@@ -1,9 +1,11 @@
 #include "tof.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
-#include "vl53l1x.h"
+#include <stdint.h>
 
 #define I2C_SDA_NUM 21
 #define I2C_SCL_NUM 22
@@ -44,6 +46,7 @@ void vl53l1x_diagnostics(vl53l1x_t *v) {
   ESP_LOGI(TAG, "  Timeout A: 0x%04X", timeout_a);
   ESP_LOGI(TAG, "  Timeout B: 0x%04X", timeout_b);
 }
+
 static void scan_i2c() {
   ESP_LOGI(TAG, "Starting I2C scan...");
 
@@ -72,16 +75,16 @@ static void scan_i2c() {
 }
 
 int tof_init(vl53l1x_t *dev) {
-  ESP_LOGI(TAG, "Configuring VL53L1X");
+  ESP_LOGI(TAG, "tof_init called");
 
   vTaskDelay(pdMS_TO_TICKS(100));
-  dev = vl53l1x_config(0,           // port
-                       I2C_SCL_NUM, // scl
-                       I2C_SDA_NUM, // sda
-                       -1,          // xshut (not used)
-                       0x29,        // I2C address
-                       0            // io_2v8
-  );
+  // dev = vl53l1x_config(0,           // port
+  //                      I2C_SCL_NUM, // scl
+  //                      I2C_SDA_NUM, // sda
+  //                      -1,          // xshut (not used)
+  //                      0x29,        // I2C address
+  //                      0            // io_2v8
+  // );
 
   if (!dev) {
     ESP_LOGE(TAG, "vl53l1x_config failed");
@@ -147,7 +150,7 @@ int tof_init(vl53l1x_t *dev) {
   vTaskDelay(pdMS_TO_TICKS(100));
 
   /* ---- Single-shot ---- */
-  ESP_LOGI(TAG, "Starting single-shot measurements...");
+  ESP_LOGI(TAG, "Starting single-shot measurements...(tof_init)");
   return 0;
 }
 
@@ -188,7 +191,7 @@ int tof_loop_iteration(vl53l1x_t *dev) {
 }
 
 int tof_main(void) {
-  ESP_LOGI(TAG, "Configuring VL53L1X");
+  ESP_LOGI(TAG, "we enter tof_main");
 
   vTaskDelay(pdMS_TO_TICKS(100));
   vl53l1x_t *dev = vl53l1x_config(0,           // port
@@ -201,15 +204,26 @@ int tof_main(void) {
 
   tof_init(dev);
 
+  if (!dev) {
+    ESP_LOGI(TAG, "dev is NULL");
+    return 1;
+  }
   /* ---- Single-shot ---- */
-  ESP_LOGI(TAG, "Starting single-shot measurements...");
+  ESP_LOGI(TAG, "entering loop");
 
   int res;
   while (1) {
     res = tof_loop_iteration(dev);
-    if (res <= 0) {
+    vTaskDelay(pdMS_TO_TICKS(30));
+    if (res <= -1) {
       return -1;
     }
   }
   return 0;
+}
+
+int get_random_test_tof_values() {
+  uint32_t value = esp_random();
+  int cropped_value = (int)value;
+  return cropped_value;
 }

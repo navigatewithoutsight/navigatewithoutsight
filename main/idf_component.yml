@@ -1,6 +1,0 @@
-description: "Time-of-Flight sensor"
-version: "1.0.0"
-# url: "https://github.com/your-org/navigate_without_sight"
-dependencies:
-  vl53l1x_dep:
-    git: https://github.com/revk/ESP32-VL53L1X.git
