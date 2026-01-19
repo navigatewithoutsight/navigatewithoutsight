@@ -34,6 +34,10 @@ void all_modules_main() {
   buzzer_set_mode_event(1); // startup beep
 
   float gz; // store z-axis degree/sec readings, updates each loop
+  int turn_dir = 0;
+  int turn_deg = 0;
+  int spm = 0;
+  int speed_x100 = 0;
   int iteration_error = 0; // 1 is error, 0 is success
   int event = 0;           // 1 is error, 0 is success
   int direction = 0;       // 1 is error, 0 is success
@@ -42,14 +46,19 @@ void all_modules_main() {
     ESP_LOGI(ALL_MODULES_MAIN, "Iteration starts...");
     gy87_loop_iteration(&gz);
     distance = tof_loop_iteration(dev);
+    if (gz > 20.0f) turn_dir =1;
+    else if (gz < -20.0f) turn_dir = -1;
+    else turn_dir = 0;
     /*// Testing: cahnge with real distance from ToF
     buzzer_set_distance_cm(999, 1);  // 999cm = far away, valid reading
     buzzer_set_error(0);            // no error for now
   */
-    ssd1306_render_dashboard(0, // turn_dir (LEFT / RIGHT / NONE) → placeholder
-                             0, // turn_deg
-                             0, // steps per minute
-                             0, // speed * 100
+    turn_deg = (int)gz;
+
+    ssd1306_render_dashboard(turn_dir, // turn_dir (LEFT / RIGHT / NONE) → placeholder
+                             turn_deg, // turn_deg
+                             spm, // steps per minute
+                             speed_x100, // speed * 100
                              NULL, // depth
                              0);
     buzzer_iteration_main(iteration_error, event, direction, distance);
