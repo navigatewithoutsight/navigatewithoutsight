@@ -6,16 +6,28 @@
 #include "ssd1306_simple.h"
 #include "tof.h"
 
-static const char *ALL_MODULES_MAIN = "TOF";
+#define I2C_SDA_NUM 21
+#define I2C_SCL_NUM 22
+static const char *ALL_MODULES_MAIN = "REAL_MAIN";
 
+// This is main_main function
+// STEPS:
+// 1. Init bus. VL lib does it
+// 2. Init mcu
+// 3. loop
 void all_modules_main() {
-  // STEPS:
-  // 1. Init bus. VL lib does it
-  // 2. Init mcu
-  // 3. loop
+  SemaphoreHandle_t i2c_mutex;
+  i2c_mutex = xSemaphoreCreateMutex();
   vl53l1x_t *dev = NULL;
+  dev = vl53l1x_config(0,           // port
+                       I2C_SCL_NUM, // scl
+                       I2C_SDA_NUM, // sda
+                       -1,          // xshut (not used)
+                       0x29,        // I2C address
+                       0            // io_2v8
+  );
 
-  vTaskDelay(pdMS_TO_TICKS(400)); // Дать время на освобождение стека
+  // vTaskDelay(pdMS_TO_TICKS(400));
   ESP_LOGI(ALL_MODULES_MAIN, "Start...");
   int err;
   err = tof_init(dev);
@@ -43,26 +55,34 @@ void all_modules_main() {
   int event = 0;           // 1 is error, 0 is success
   int direction = 0;       // 1 is error, 0 is success
   int distance = 999;
+
   while (1) {
-    ESP_LOGI(ALL_MODULES_MAIN, "Iteration starts...");
-    gy87_loop_iteration(&gz);
-    distance = tof_loop_iteration(dev);
-    if (gz > 20.0f) turn_dir =1;
-    else if (gz < -20.0f) turn_dir = -1;
-    else turn_dir = 0;
-    /*// Testing: cahnge with real distance from ToF
-    buzzer_set_distance_cm(999, 1);  // 999cm = far away, valid reading
+    // ESP_LOGI(ALL_MODULES_MAIN, "Iteration starts...");
+    gy87_loop_iteration(&gz, i2c_mutex);
+    distance = tof_loop_iteration(dev, i2c_mutex);
+    // ESP_LOGI(ALL_MODULES_MAIN, "Single-shot result: %u mm", distance);
+    // ESP_LOGI(ALL_MODULES_MAIN, "(%.2f °/s)", gz);
+
+    if (gz > 20.0f)
+      turn_dir = 1;
+    else if (gz < -20.0f)
+      turn_dir = -1;
+    else
+      turn_dir = 0;
+    // Testing: cahnge with real distance from ToF
+    buzzer_set_distance_cm(999, 1); // 999cm = far away, valid reading
     buzzer_set_error(0);            // no error for now
-  */
+
     turn_deg = (int)gz;
 
-    ssd1306_render_dashboard(turn_dir, // turn_dir (LEFT / RIGHT / NONE) → placeholder
-                             turn_deg, // turn_deg
-                             spm, // steps per minute
-                             speed_x100, // speed * 100
-                             NULL, // depth
-                             0);
+    ssd1306_render_dashboard(
+        turn_dir,   // turn_dir (LEFT / RIGHT / NONE) → placeholder
+        turn_deg,   // turn_deg
+        spm,        // steps per minute
+        speed_x100, // speed * 100
+        NULL,       // depth
+        0, i2c_mutex);
     buzzer_iteration_main(iteration_error, event, direction, distance);
-    ESP_LOGI(ALL_MODULES_MAIN, "Iteration ends...");
+    // ESP_LOGI(ALL_MODULES_MAIN, "Iteration ends...");
   }
 }

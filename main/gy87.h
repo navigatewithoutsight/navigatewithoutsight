@@ -1,5 +1,6 @@
 #ifndef GY87_H
 #define GY87_H
+#include "freertos/idf_additions.h"
 
 typedef enum {
   // defines a new enumeration type, code more readable
@@ -12,8 +13,8 @@ typedef enum {
 void gy87_main(void);
 int GY87_init(void);
 int GY87_init_no_i2c_bus(void);
-void gy87_loop_iteration(float *gz);
-int GY87_read_gyro_z(float *gyro_z);
+int GY87_read_gyro_z(float *gyro_z, SemaphoreHandle_t mutex);
+void gy87_loop_iteration(float *gz, SemaphoreHandle_t mutex);
 turn_direction_t GY87_detect_turn(float gyro_z);
 int GY87_init_no_i2c_bus(void);
 

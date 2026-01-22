@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "ssd1306_simple.h"
 #include <math.h>
@@ -75,14 +76,22 @@ int GY87_init(void) {
 
 /* ================= GYRO ================= */
 
-int GY87_read_gyro_z(float *gyro_z) {
+int GY87_read_gyro_z(float *gyro_z, SemaphoreHandle_t mutex) {
   uint8_t reg = MPU6050_RA_GYRO_ZOUT_H;
   uint8_t data[2];
 
-  if (i2c_master_write_read_device(I2C_PORT, MPU6050_ADDR, &reg, 1, data, 2,
-                                   pdMS_TO_TICKS(100)) != ESP_OK)
-    return -1;
+  if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
+    if (i2c_master_write_read_device(I2C_PORT, MPU6050_ADDR, &reg, 1, data, 2,
+                                     pdMS_TO_TICKS(100)) != ESP_OK)
+      return -1;
 
+    xSemaphoreGive(mutex);
+    // ESP_LOGI(TAG, "Releasing lock");
+  } else {
+
+    // ESP_LOGI(TAG, "Can't aquire lock");
+    return 0;
+  }
   int16_t raw = (data[0] << 8) | data[1];
   *gyro_z = (float)raw / GYRO_SENSITIVITY;
   return 0;
@@ -136,12 +145,19 @@ static bool detect_step(float ax, float ay, float az) {
 
 /* ================= CADENCE & SPEED ================= */
 
-void GY87_update_cadence_and_speed(void) {
+void GY87_update_cadence_and_speed(SemaphoreHandle_t mutex) {
   float ax, ay, az;
 
-  if (GY87_read_accel(&ax, &ay, &az) != 0)
-    return;
+  if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
+    if (GY87_read_accel(&ax, &ay, &az) != 0)
+      return;
 
+    xSemaphoreGive(mutex);
+    // ESP_LOGI("GAIT", "Released lock");
+  } else {
+    // ESP_LOGI("GAIT", "Can't aquire lock");
+    return;
+  }
   if (detect_step(ax, ay, az))
     step_count++;
 
@@ -156,8 +172,8 @@ void GY87_update_cadence_and_speed(void) {
     float cadence_spm = cadence_hz * 60.0f;
     float speed_mps = cadence_hz * ASSUMED_STEP_LENGTH_M;
 
-    ESP_LOGI("GAIT", "Cadence: %.1f spm | Estimated speed: %.2f m/s",
-             cadence_spm, speed_mps);
+    // ESP_LOGI("GAIT", "Cadence: %.1f spm | Estimated speed: %.2f m/s",
+    //          cadence_spm, speed_mps);
 
     step_count = 0;
     cadence_window_start_us = now;
@@ -166,33 +182,36 @@ void GY87_update_cadence_and_speed(void) {
 
 /* ================= MAIN LOOP ================= */
 
-void gy87_loop_iteration(float *gz) {
-  if (GY87_read_gyro_z(gz) == 0) {
-    turn_direction_t dir = GY87_detect_turn(*gz);
-    ssd1306_clear();
-
-    if (dir == TURN_LEFT) {
-      ESP_LOGI(TAG, "Turning LEFT (%.2f °/s)", *gz);
-      ssd1306_draw_text_xy(20, 3, "LEFT");
-    } else if (dir == TURN_RIGHT) {
-      ESP_LOGI(TAG, "Turning RIGHT (%.2f °/s)", *gz);
-      ssd1306_draw_text_xy(20, 3, "RIGHT");
-    } else {
-      ESP_LOGI(TAG, "No turn (%.2f °/s)", *gz);
-      ssd1306_draw_text_xy(10, 3, "NO TURN");
-    }
+void gy87_loop_iteration(float *gz, SemaphoreHandle_t mutex) {
+  if (GY87_read_gyro_z(gz, mutex) == 0) {
+    // turn_direction_t dir = GY87_detect_turn(*gz);
+    // ssd1306_clear();
+    //
+    // if (dir == TURN_LEFT) {
+    //   // ESP_LOGI(TAG, "Turning LEFT (%.2f °/s)", *gz);
+    //   ssd1306_draw_text_xy(20, 3, "LEFT");
+    // } else if (dir == TURN_RIGHT) {
+    //   // ESP_LOGI(TAG, "Turning RIGHT (%.2f °/s)", *gz);
+    //   ssd1306_draw_text_xy(20, 3, "RIGHT");
+    // } else {
+    //   // ESP_LOGI(TAG, "No turn (%.2f °/s)", *gz);
+    //   ssd1306_draw_text_xy(10, 3, "NO TURN");
+    // }
   }
 
-  GY87_update_cadence_and_speed();
+  GY87_update_cadence_and_speed(mutex);
 }
 
 void gy87_main(void) {
+  SemaphoreHandle_t i2c_mutex;
+  i2c_mutex = xSemaphoreCreateMutex();
+
   GY87_init();
 
   float gz;
 
   while (1) {
-    if (GY87_read_gyro_z(&gz) == 0) {
+    if (GY87_read_gyro_z(&gz, i2c_mutex) == 0) {
       turn_direction_t dir = GY87_detect_turn(gz);
       ssd1306_clear();
 
@@ -208,7 +227,7 @@ void gy87_main(void) {
       }
     }
 
-    GY87_update_cadence_and_speed();
+    GY87_update_cadence_and_speed(i2c_mutex);
 
     vTaskDelay(pdMS_TO_TICKS(50));
   }

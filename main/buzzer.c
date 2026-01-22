@@ -206,7 +206,7 @@ static void play_distance_pattern_main(int distance_cm_arg) {
     return;
   }
 
-  if (distance_cm_arg < 30) {
+  if (distance_cm_arg < 10) {
     // Danger: continuous tone
     active_on();
     vTaskDelay(pdMS_TO_TICKS(200));
@@ -230,7 +230,7 @@ static void play_distance_pattern_main(int distance_cm_arg) {
 
   //  one short beep
   active_on();
-  vTaskDelay(pdMS_TO_TICKS(60));
+  vTaskDelay(pdMS_TO_TICKS(10));
   active_off();
 
   // vTaskDelay(pdMS_TO_TICKS(wait_ms));

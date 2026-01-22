@@ -3,8 +3,10 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
 #include "freertos/task.h"
+#include "portmacro.h"
 #include <stdint.h>
 
 #define I2C_SDA_NUM 21
@@ -78,13 +80,6 @@ int tof_init(vl53l1x_t *dev) {
   ESP_LOGI(TAG, "tof_init called");
 
   vTaskDelay(pdMS_TO_TICKS(100));
-  // dev = vl53l1x_config(0,           // port
-  //                      I2C_SCL_NUM, // scl
-  //                      I2C_SDA_NUM, // sda
-  //                      -1,          // xshut (not used)
-  //                      0x29,        // I2C address
-  //                      0            // io_2v8
-  // );
 
   if (!dev) {
     ESP_LOGE(TAG, "vl53l1x_config failed");
@@ -154,44 +149,53 @@ int tof_init(vl53l1x_t *dev) {
   return 0;
 }
 
-int tof_loop_iteration(vl53l1x_t *dev) {
-  vl53l1x_writeReg(dev, SYSTEM__INTERRUPT_CLEAR, 0x01);
+int tof_loop_iteration(vl53l1x_t *dev, SemaphoreHandle_t mutex) {
+  if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
+    vl53l1x_writeReg(dev, SYSTEM__INTERRUPT_CLEAR, 0x01);
+    uint16_t distance = vl53l1x_readSingle(dev, 1);
 
-  uint16_t distance = vl53l1x_readSingle(dev, 1);
+    //
+    uint8_t raw_status =
+        vl53l1x_readReg(dev, RESULT__RANGE_STATUS); // RESULT__RANGE_STATUS
 
-  //
-  uint8_t raw_status =
-      vl53l1x_readReg(dev, RESULT__RANGE_STATUS); // RESULT__RANGE_STATUS
+    // ESP_LOGI(TAG, "Single-shot result: %u mm, raw_status=0x%02X", distance,
+    //          raw_status);
 
-  ESP_LOGI(TAG, "Single-shot result: %u mm, raw_status=0x%02X", distance,
-           raw_status);
+    // ESP_LOGI(TAG, "Release lock");
+    xSemaphoreGive(mutex);
 
-  // vl53l1x_rangeStatusToString copy-paste
-  switch (raw_status) {
-  case 0x09: // Range Complete
-    ESP_LOGI(TAG, "Status: Range Valid");
-    return distance;
-  case 0x02: // Signal Fail
-    ESP_LOGI(TAG, "Status: Signal Fail (no target)");
-    break;
-  case 0x04: // Sigma Fail
-    ESP_LOGI(TAG, "Status: Sigma Fail");
-    break;
-  case 0x05: // Out of Bounds
-    ESP_LOGI(TAG, "Status: Out of Bounds");
-    break;
-  case 0x07: // Wrap Target Fail
-    ESP_LOGI(TAG, "Status: Wrap Target Fail");
-    break;
-  default:
-    ESP_LOGI(TAG, "Status: Unknown (0x%02X)", raw_status);
-    return -1;
+    // vl53l1x_rangeStatusToString copy-paste
+    switch (raw_status) {
+    case 0x09: // Range Complete
+      // ESP_LOGI(TAG, "Status: Range Valid");
+      return distance;
+    case 0x02: // Signal Fail
+      // ESP_LOGI(TAG, "Status: Signal Fail (no target)");
+      break;
+    case 0x04: // Sigma Fail
+      // ESP_LOGI(TAG, "Status: Sigma Fail");
+      break;
+    case 0x05: // Out of Bounds
+      // ESP_LOGI(TAG, "Status: Out of Bounds");
+      break;
+    case 0x07: // Wrap Target Fail
+      // ESP_LOGI(TAG, "Status: Wrap Target Fail");
+      break;
+    default:
+      // ESP_LOGI(TAG, "Status: Unknown (0x%02X)", raw_status);
+      return -1;
+    }
+    return 0;
+  } else {
+    // ESP_LOGI(TAG, "Can't aquire lock");
+    return 0;
   }
-  return 0;
 }
 
 int tof_main(void) {
   ESP_LOGI(TAG, "we enter tof_main");
+  SemaphoreHandle_t i2c_mutex;
+  i2c_mutex = xSemaphoreCreateMutex();
 
   vTaskDelay(pdMS_TO_TICKS(100));
   vl53l1x_t *dev = vl53l1x_config(0,           // port
@@ -213,7 +217,7 @@ int tof_main(void) {
 
   int res;
   while (1) {
-    res = tof_loop_iteration(dev);
+    res = tof_loop_iteration(dev, i2c_mutex);
     vTaskDelay(pdMS_TO_TICKS(30));
     if (res <= -1) {
       return -1;
