@@ -268,8 +268,8 @@ static void format_speed_x100(int speed_x100, char *out, int out_sz) {
 /* ===================== DASHBOARD ===================== */
 
 void ssd1306_render_dashboard(int turn_dir, int turn_deg, int spm,
-                              int speed_mps_x100, const uint8_t *depth,
-                              int depth_count, SemaphoreHandle_t mutex) {
+                              int speed_mps_x100, int distance_mm,
+                              SemaphoreHandle_t mutex) {
   const int split_x = 48;
   const int top_h = 26;
 
@@ -309,31 +309,20 @@ void ssd1306_render_dashboard(int turn_dir, int turn_deg, int spm,
     int map_w = OLED_W - map_x - 2;
     int map_h = OLED_H - 4;
 
-    ssd1306_draw_rect(map_x, map_y, map_w, map_h, 1);
-    ssd1306_draw_text_xy(map_x + 6, map_y + 2, "DEPTH");
+   ssd1306_draw_rect(map_x, map_y, map_w, map_h, 1);
+   ssd1306_draw_text_xy(map_x + 6, map_y + 2, "DIST");
 
-    if (depth && depth_count > 0) {
-      int bar_y0 = map_y + 12;
-      int bar_y1 = map_y + map_h - 2;
-      int bar_h = bar_y1 - bar_y0;
 
-      int max_bars = map_w - 2;
-      if (depth_count > max_bars)
-        depth_count = max_bars;
+   
+   int distance_cm = distance_mm / 10;
 
-      for (int i = 0; i < depth_count; i++) {
-        int h = depth[i];
-        if (h < 0)
-          h = 0;
-        if (h > bar_h)
-          h = bar_h;
+   ssd1306_draw_text_xy(map_x + 6, map_y + 20, "DIST:");
 
-        int x = map_x + 1 + i;
-        ssd1306_draw_vline(x, bar_y1 - h, bar_y1, 1);
-      }
-    } else {
-      ssd1306_draw_text_xy(map_x + 6, map_y + 20, "NO DATA");
-    }
+   char dist_str[12];
+   itoa_simple(distance_cm, dist_str, sizeof(dist_str));
+   ssd1306_draw_text_xy(map_x + 6, map_y + 32, dist_str);
+   ssd1306_draw_text_xy(map_x + 6 + (int)strlen(dist_str) * 6, map_y + 32, "CM");
+
 
     ssd1306_update();
     xSemaphoreGive(mutex);

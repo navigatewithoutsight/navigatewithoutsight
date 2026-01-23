@@ -27,7 +27,7 @@ void ssd1306_draw_text_xy(int x, int y, const char *text);
  * depth_count: number of depth values
  */
 void ssd1306_render_dashboard(int turn_dir, int turn_deg, int spm,
-                              int speed_mps_x100, const uint8_t *depth,
-                              int depth_count, SemaphoreHandle_t mutex);
+                              int speed_mps_x100, int distance_mm,
+                              SemaphoreHandle_t mutex);
 
 #endif

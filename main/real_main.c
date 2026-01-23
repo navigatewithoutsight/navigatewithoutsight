@@ -69,6 +69,9 @@ void all_modules_main() {
     ESP_LOGI(ALL_MODULES_MAIN, "Iteration took microsecs: %d",
              (uint)(end - start));
     gy87_loop_iteration(&cadence, &speed, &gz, i2c_mutex);
+    spm = (int)(cadence + 0.5f);
+    speed_x100 = (int)(speed * 100.0f + 0.5f);
+
     tof_loop_iteration(dev, i2c_mutex);
     ESP_LOGI(ALL_MODULES_MAIN, "Single-shot result: %u mm",
              dev->ranging_data.range_mm);
@@ -92,8 +95,8 @@ void all_modules_main() {
         turn_deg,   // turn_deg
         spm,        // steps per minute
         speed_x100, // speed * 100
-        NULL,       // depth
-        0, i2c_mutex);
+        dev->ranging_data.range_mm,
+        i2c_mutex);
     buzzer_iteration_main(iteration_error, event, direction,
                           dev->ranging_data.range_mm);
     start = end;
