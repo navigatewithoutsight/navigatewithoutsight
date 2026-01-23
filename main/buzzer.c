@@ -1,257 +1,251 @@
 #include "buzzer.h"
+
 #include "driver/gpio.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include <stdbool.h>
+#include "driver/ledc.h"
+#include "esp_log.h"
+#include "esp_timer.h"
 
-// Active buzzer: (obstacle/direction/error)
-// Passive buzzer: (startup/mode)
+#include <stdint.h>
 
-// saved values
-static int distance_cm = 999; // last distance we got
-static int distance_ok = 0;
+static const char *TAG = "buzzer";
 
-static int direction = 0;
-static int mode_event = 0;
-static int error_on = 0; // 1 = error, 0 = normal
+/* System state */
+static int   s_distance_cm = 999;
+static bool  s_distance_ok = false;
+static int   s_direction   = 0;
+static int   s_mode_event  = 0;
+static bool  s_error_on    = false;
 
-// on off
-static void active_on(void) { gpio_set_level(ACTIVE_BUZZER_PIN, 1); }
+/* Buzzer state */
+static bool    s_active_is_on  = false;
+static bool    s_passive_is_on = false;
+static int64_t s_passive_event_end_us = 0;
 
-static void active_off(void) { gpio_set_level(ACTIVE_BUZZER_PIN, 0); }
-
-static void passive_on(void) { gpio_set_level(PASSIVE_BUZZER_PIN, 1); }
-
-static void passive_off(void) { gpio_set_level(PASSIVE_BUZZER_PIN, 0); }
-
-/* -------------------------
-   Public functions
-   ------------------------- */
-void buzzer_init(void) {
-  // Set the buzzer pins as outputs
-  gpio_set_direction(ACTIVE_BUZZER_PIN, GPIO_MODE_OUTPUT);
-  gpio_set_direction(PASSIVE_BUZZER_PIN, GPIO_MODE_OUTPUT);
-
-  // Make sure both buzzers start OFF
-  active_off();
-  passive_off();
+/* Time helper */
+static inline int64_t now_us(void)
+{
+    return esp_timer_get_time();
 }
 
-void buzzer_set_distance_cm(int new_distance_cm, int is_valid) {
-  // Save the latest distance reading
-  distance_cm = new_distance_cm;
-  distance_ok = is_valid;
+/* Active buzzer control */
+static inline void active_set(bool on)
+{
+    gpio_set_level(ACTIVE_BUZZER_PIN, on ? 1 : 0);
+    s_active_is_on = on;
 }
 
-void buzzer_set_direction(int new_direction) {
+/* Passive buzzer PWM config */
+#define PASSIVE_LEDC_MODE        LEDC_LOW_SPEED_MODE
+#define PASSIVE_LEDC_TIMER       LEDC_TIMER_0
+#define PASSIVE_LEDC_CHANNEL     LEDC_CHANNEL_0
+#define PASSIVE_LEDC_DUTY_RES    LEDC_TIMER_10_BIT
+#define PASSIVE_LEDC_DUTY_ON     512
+#define PASSIVE_DEFAULT_FREQ_HZ  2000
 
-  // -1 = left, 0 = ok, 1 = right
-  direction = new_direction;
+static void passive_pwm_init(void)
+{
+    ledc_timer_config_t timer = {
+        .speed_mode      = PASSIVE_LEDC_MODE,
+        .duty_resolution = PASSIVE_LEDC_DUTY_RES,
+        .timer_num       = PASSIVE_LEDC_TIMER,
+        .freq_hz         = PASSIVE_DEFAULT_FREQ_HZ,
+        .clk_cfg         = LEDC_AUTO_CLK
+    };
+    ledc_timer_config(&timer);
+
+    ledc_channel_config_t ch = {
+        .gpio_num   = PASSIVE_BUZZER_PIN,
+        .speed_mode = PASSIVE_LEDC_MODE,
+        .channel    = PASSIVE_LEDC_CHANNEL,
+        .intr_type  = LEDC_INTR_DISABLE,
+        .timer_sel  = PASSIVE_LEDC_TIMER,
+        .duty       = 0,
+        .hpoint     = 0
+    };
+    ledc_channel_config(&ch);
 }
 
-void buzzer_set_mode_event(int event_code) {
-  // Save a mode/startup event to play once
-  mode_event = event_code;
+static void passive_set_tone(bool on, uint32_t freq_hz)
+{
+    ledc_set_freq(PASSIVE_LEDC_MODE, PASSIVE_LEDC_TIMER, freq_hz);
+    ledc_set_duty(PASSIVE_LEDC_MODE, PASSIVE_LEDC_CHANNEL,
+                  on ? PASSIVE_LEDC_DUTY_ON : 0);
+    ledc_update_duty(PASSIVE_LEDC_MODE, PASSIVE_LEDC_CHANNEL);
+
+    s_passive_is_on = on;
 }
 
-void buzzer_set_error(int has_error) {
+/* Public API */
 
-  // 1 = error, 0 = normal
-  error_on = has_error;
+void buzzer_init(void)
+{
+    gpio_config_t io = {
+        .pin_bit_mask = 1ULL << ACTIVE_BUZZER_PIN,
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE
+    };
+    gpio_config(&io);
+    active_set(false);
+
+    passive_pwm_init();
+    passive_set_tone(false, PASSIVE_DEFAULT_FREQ_HZ);
+
+    s_distance_cm = 999;
+    s_distance_ok = false;
+    s_direction   = 0;
+    s_mode_event  = 0;
+    s_error_on    = false;
+    s_passive_event_end_us = 0;
+
+    ESP_LOGI(TAG, "Buzzer initialized");
 }
 
-static void play_error_pattern(void) {
-  // 3x beep, then a pause
-  for (int i = 0; i < 3; i++) {
-    active_on();
-    vTaskDelay(pdMS_TO_TICKS(100));
-    active_off();
-    vTaskDelay(pdMS_TO_TICKS(100));
-  }
+void buzzer_set_distance_cm(int distance_value, int is_valid)
+{
+    int cm = distance_value;
 
-  // Longer pause
-  vTaskDelay(pdMS_TO_TICKS(400));
-}
-
-static void play_mode_event_pattern(void) {
-  // Passive buzzer short double beep for startup/mode change
-  passive_on();
-  vTaskDelay(pdMS_TO_TICKS(80));
-  passive_off();
-  vTaskDelay(pdMS_TO_TICKS(80));
-  passive_on();
-  vTaskDelay(pdMS_TO_TICKS(80));
-  passive_off();
-
-  //  played it once, clear
-  mode_event = 0;
-}
-
-/// warnings
-// left (-1)  = two short beeps
-// right (1)  = one long beep
-static void direction_pattern(int direction) {
-
-  if (direction < 0) {
-    // left: two short beeps
-    for (int i = 0; i < 2; i++) {
-      active_on();
-      vTaskDelay(pdMS_TO_TICKS(80));
-      active_off();
-      vTaskDelay(pdMS_TO_TICKS(80));
+    if (distance_value > 300) {
+        cm = distance_value / 10; // assume mm
     }
-  } else if (direction > 0) {
-    // right: one long beep
-    active_on();
-    vTaskDelay(pdMS_TO_TICKS(200));
-    active_off();
-  }
 
-  // Clear direction so it doesn't keep repeating forever
-  direction = 0;
+    if (cm < 0) cm = 0;
+    if (cm > 999) cm = 999;
+
+    s_distance_cm = cm;
+    s_distance_ok = (is_valid != 0);
 }
 
-static void play_direction_pattern(void) {
-  /// warnings
-  // left (-1)  = two short beeps
-  // right (1)  = one long beep
+void buzzer_set_direction(int direction)
+{
+    s_direction = direction;
+}
 
-  if (direction < 0) {
-    // left: two short beeps
-    for (int i = 0; i < 2; i++) {
-      active_on();
-      vTaskDelay(pdMS_TO_TICKS(80));
-      active_off();
-      vTaskDelay(pdMS_TO_TICKS(80));
+void buzzer_set_mode_event(int event_code)
+{
+    s_mode_event = event_code;
+}
+
+void buzzer_set_error(int has_error)
+{
+    s_error_on = (has_error != 0);
+}
+
+/* Distance to beep timing */
+static uint32_t distance_to_period_ms(int distance_cm)
+{
+    if (distance_cm >= 150) return 1000;
+    if (distance_cm <= 30)  return 150;
+
+    return 150 + (uint32_t)((1000 - 150) * (distance_cm - 30) / 120);
+}
+
+/* Passive buzzer one-shot tones */
+static void service_passive_mode_event(int64_t tnow)
+{
+    if (s_mode_event == 0) return;
+    if (s_passive_event_end_us > tnow) return;
+
+    uint32_t freq = 2000;
+    uint32_t dur_ms = 120;
+
+    if (s_mode_event == 1)      { freq = 2500; dur_ms = 150; }
+    else if (s_mode_event == 2) { freq = 1200; dur_ms = 180; }
+    else if (s_mode_event == 3) { freq = 1800; dur_ms = 120; }
+
+    passive_set_tone(true, freq);
+    s_passive_event_end_us = tnow + (int64_t)dur_ms * 1000;
+    s_mode_event = 0;
+}
+
+static void service_passive_stop(int64_t tnow)
+{
+    if (s_passive_is_on &&
+        s_passive_event_end_us > 0 &&
+        tnow >= s_passive_event_end_us)
+    {
+        passive_set_tone(false, PASSIVE_DEFAULT_FREQ_HZ);
+        s_passive_event_end_us = 0;
     }
-  } else if (direction > 0) {
-    // right: one long beep
-    active_on();
-    vTaskDelay(pdMS_TO_TICKS(200));
-    active_off();
-  }
-
-  // Clear direction so it doesn't keep repeating forever
-  direction = 0;
 }
 
-static void play_distance_pattern(void) {
-  // Distance warnings:
-  // - closer distance -> faster beeps
-  // - below 30cm -> continuous tone
+/* Error pattern on active buzzer */
+static void service_active_error(int64_t tnow)
+{
+    int64_t t = tnow % (1200 * 1000);
 
-  if (distance_ok == 0) {
+    bool on = (t < 100000) ||
+              (t >= 200000 && t < 300000) ||
+              (t >= 400000 && t < 500000);
 
-    play_error_pattern();
-    return;
-  }
-
-  if (distance_cm < 30) {
-    // Danger: continuous tone
-    active_on();
-    vTaskDelay(pdMS_TO_TICKS(200));
-    return; // keep it on
-  }
-
-  // If not danger zone, ensure it's off before beeping
-  active_off();
-
-  // How long to wait between beeps
-  int wait_ms = 1000;
-
-  if (distance_cm > 150)
-    wait_ms = 1000; // far
-  else if (distance_cm > 80)
-    wait_ms = 500;
-  else if (distance_cm > 50)
-    wait_ms = 250;
-  else
-    wait_ms = 150; // close
-
-  //  one short beep
-  active_on();
-  vTaskDelay(pdMS_TO_TICKS(60));
-  active_off();
-
-  vTaskDelay(pdMS_TO_TICKS(wait_ms));
+    if (on != s_active_is_on) active_set(on);
 }
 
-// void buzzer_iteration() {
-//
-//   if (error_on == 1) {
-//     play_error_pattern();
-//     return;
-//   }
-//
-//   if (mode_event != 0) {
-//     play_mode_event_pattern();
-//     return;
-//   }
-//
-//   if (direction != 0) {
-//     play_direction_pattern();
-//     return;
-//   }
-//
-//   play_distance_pattern();
-// }
+/* Direction cue (optional) */
+static void service_active_direction(int64_t tnow)
+{
+    if (s_direction == 0) return;
 
-// Distance warnings:
-// - closer distance -> faster beeps
-// - below 30cm -> continuous tone
-static void play_distance_pattern_main(int distance_cm_arg) {
+    int64_t t = tnow % (600 * 1000);
+    bool on = false;
 
-  if (distance_cm_arg == 0) {
-    play_error_pattern();
-    return;
-  }
+    if (s_direction < 0) {
+        on = (t < 80000) || (t >= 160000 && t < 240000);
+    } else {
+        on = (t < 200000);
+    }
 
-  if (distance_cm_arg < 10) {
-    // Danger: continuous tone
-    active_on();
-    vTaskDelay(pdMS_TO_TICKS(200));
-    return; // keep it on
-  }
-
-  // If not danger zone, ensure it's off before beeping
-  active_off();
-
-  // How long to wait between beeps
-  int wait_ms = 1000; // 1 second.
-
-  if (distance_cm_arg > 150)
-    wait_ms = 1000; // far
-  else if (distance_cm_arg > 80)
-    wait_ms = 500;
-  else if (distance_cm_arg > 50)
-    wait_ms = 250;
-  else
-    wait_ms = 150; // close
-
-  //  one short beep
-  active_on();
-  vTaskDelay(pdMS_TO_TICKS(10));
-  active_off();
-
-  // vTaskDelay(pdMS_TO_TICKS(wait_ms));
+    if (on != s_active_is_on) active_set(on);
+    if (t >= 599000) s_direction = 0;
 }
-void buzzer_iteration_main(int err, int event, int direction_arg,
-                           int distance_mm) {
 
-  if (err == 1) {
-    play_error_pattern();
-    return;
-  }
+/* Main distance-based warning */
+static void service_active_distance(int64_t tnow)
+{
+    if (!s_distance_ok) {
+        service_active_error(tnow);
+        return;
+    }
 
-  if (event != 0) {
-    play_mode_event_pattern();
-    return;
-  }
+    if (s_distance_cm > 0 && s_distance_cm < 30) {
+        if (!s_active_is_on) active_set(true);
+        return;
+    }
 
-  if (direction_arg != 0) {
-    direction_pattern(direction_arg);
-    return;
-  }
+    int64_t period_us =
+        (int64_t)distance_to_period_ms(s_distance_cm) * 1000;
 
-  play_distance_pattern_main(distance_mm);
+    bool on = (tnow % period_us) < (60 * 1000);
+    if (on != s_active_is_on) active_set(on);
+}
+
+void buzzer_iteration(void)
+{
+    int64_t tnow = now_us();
+
+    service_passive_mode_event(tnow);
+    service_passive_stop(tnow);
+
+    if (s_error_on) {
+        service_active_error(tnow);
+        return;
+    }
+
+    if (s_direction != 0) {
+        service_active_direction(tnow);
+        return;
+    }
+
+    service_active_distance(tnow);
+}
+
+void buzzer_iteration_main(int err, int event, int direction_arg, int distance_mm)
+{
+    buzzer_set_error(err);
+    if (event) buzzer_set_mode_event(event);
+    if (direction_arg) buzzer_set_direction(direction_arg);
+
+    buzzer_set_distance_cm(distance_mm, 1);
+    buzzer_iteration();
 }
