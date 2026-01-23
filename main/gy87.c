@@ -145,7 +145,8 @@ static bool detect_step(float ax, float ay, float az) {
 
 /* ================= CADENCE & SPEED ================= */
 
-void GY87_update_cadence_and_speed(SemaphoreHandle_t mutex) {
+void GY87_update_cadence_and_speed(float *cadence, float *speed,
+                                   SemaphoreHandle_t mutex) {
   float ax, ay, az;
 
   if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
@@ -169,11 +170,8 @@ void GY87_update_cadence_and_speed(SemaphoreHandle_t mutex) {
   if ((now - cadence_window_start_us) > (CADENCE_WINDOW_MS * 1000)) {
     float window_sec = CADENCE_WINDOW_MS / 1000.0f;
     float cadence_hz = step_count / window_sec;
-    float cadence_spm = cadence_hz * 60.0f;
-    float speed_mps = cadence_hz * ASSUMED_STEP_LENGTH_M;
-
-    // ESP_LOGI("GAIT", "Cadence: %.1f spm | Estimated speed: %.2f m/s",
-    //          cadence_spm, speed_mps);
+    *cadence = cadence_hz * 60.0f;
+    *speed = cadence_hz * ASSUMED_STEP_LENGTH_M;
 
     step_count = 0;
     cadence_window_start_us = now;
@@ -182,7 +180,8 @@ void GY87_update_cadence_and_speed(SemaphoreHandle_t mutex) {
 
 /* ================= MAIN LOOP ================= */
 
-void gy87_loop_iteration(float *gz, SemaphoreHandle_t mutex) {
+void gy87_loop_iteration(float *cadence_arg, float *speed_arg, float *gz,
+                         SemaphoreHandle_t mutex) {
   if (GY87_read_gyro_z(gz, mutex) == 0) {
     // turn_direction_t dir = GY87_detect_turn(*gz);
     // ssd1306_clear();
@@ -199,12 +198,13 @@ void gy87_loop_iteration(float *gz, SemaphoreHandle_t mutex) {
     // }
   }
 
-  GY87_update_cadence_and_speed(mutex);
+  GY87_update_cadence_and_speed(cadence_arg, speed_arg, mutex);
 }
 
 void gy87_main(void) {
   SemaphoreHandle_t i2c_mutex;
   i2c_mutex = xSemaphoreCreateMutex();
+  float speed, cadence;
 
   GY87_init();
 
@@ -227,7 +227,7 @@ void gy87_main(void) {
       }
     }
 
-    GY87_update_cadence_and_speed(i2c_mutex);
+    GY87_update_cadence_and_speed(&cadence, &speed, i2c_mutex);
 
     vTaskDelay(pdMS_TO_TICKS(50));
   }

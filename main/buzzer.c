@@ -236,7 +236,7 @@ static void play_distance_pattern_main(int distance_cm_arg) {
   // vTaskDelay(pdMS_TO_TICKS(wait_ms));
 }
 void buzzer_iteration_main(int err, int event, int direction_arg,
-                           int distance_cm) {
+                           int distance_mm) {
 
   if (err == 1) {
     play_error_pattern();
@@ -253,5 +253,5 @@ void buzzer_iteration_main(int err, int event, int direction_arg,
     return;
   }
 
-  play_distance_pattern_main(distance_cm);
+  play_distance_pattern_main(distance_mm);
 }

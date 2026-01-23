@@ -149,46 +149,44 @@ int tof_init(vl53l1x_t *dev) {
   return 0;
 }
 
-int tof_loop_iteration(vl53l1x_t *dev, SemaphoreHandle_t mutex) {
+// Using this function breaks everything. Dont' use it
+void tof_status_read(uint8_t raw_status) {
+  switch (raw_status) {
+  case 0x09: // Range Complete
+    ESP_LOGI(TAG, "Status: Range Valid");
+    break;
+  case 0x02: // Signal Fail
+    ESP_LOGI(TAG, "Status: Signal Fail (no target)");
+    break;
+  case 0x04: // Sigma Fail
+    ESP_LOGI(TAG, "Status: Sigma Fail");
+    break;
+  case 0x05: // Out of Bounds
+    ESP_LOGI(TAG, "Status: Out of Bounds");
+    break;
+  case 0x07: // Wrap Target Fail
+    ESP_LOGI(TAG, "Status: Wrap Target Fail");
+    break;
+  default:
+    ESP_LOGI(TAG, "Status: Unknown (0x%02X)", raw_status);
+    return;
+  }
+  return;
+}
+
+void tof_loop_iteration(vl53l1x_t *dev, SemaphoreHandle_t mutex) {
   if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
     vl53l1x_writeReg(dev, SYSTEM__INTERRUPT_CLEAR, 0x01);
-    uint16_t distance = vl53l1x_readSingle(dev, 1);
+    dev->ranging_data.range_mm = vl53l1x_readSingle(dev, 1);
 
-    //
-    uint8_t raw_status =
+    dev->ranging_data.range_status =
         vl53l1x_readReg(dev, RESULT__RANGE_STATUS); // RESULT__RANGE_STATUS
 
-    // ESP_LOGI(TAG, "Single-shot result: %u mm, raw_status=0x%02X", distance,
-    //          raw_status);
-
-    // ESP_LOGI(TAG, "Release lock");
     xSemaphoreGive(mutex);
 
-    // vl53l1x_rangeStatusToString copy-paste
-    switch (raw_status) {
-    case 0x09: // Range Complete
-      // ESP_LOGI(TAG, "Status: Range Valid");
-      return distance;
-    case 0x02: // Signal Fail
-      // ESP_LOGI(TAG, "Status: Signal Fail (no target)");
-      break;
-    case 0x04: // Sigma Fail
-      // ESP_LOGI(TAG, "Status: Sigma Fail");
-      break;
-    case 0x05: // Out of Bounds
-      // ESP_LOGI(TAG, "Status: Out of Bounds");
-      break;
-    case 0x07: // Wrap Target Fail
-      // ESP_LOGI(TAG, "Status: Wrap Target Fail");
-      break;
-    default:
-      // ESP_LOGI(TAG, "Status: Unknown (0x%02X)", raw_status);
-      return -1;
-    }
-    return 0;
+    return;
   } else {
-    // ESP_LOGI(TAG, "Can't aquire lock");
-    return 0;
+    return;
   }
 }
 
@@ -215,11 +213,10 @@ int tof_main(void) {
   /* ---- Single-shot ---- */
   ESP_LOGI(TAG, "entering loop");
 
-  int res;
   while (1) {
-    res = tof_loop_iteration(dev, i2c_mutex);
+    tof_loop_iteration(dev, i2c_mutex);
     vTaskDelay(pdMS_TO_TICKS(30));
-    if (res <= -1) {
+    if (dev->ranging_data.range_status <= -1) {
       return -1;
     }
   }

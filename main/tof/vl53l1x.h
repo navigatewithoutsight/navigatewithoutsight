@@ -4,10 +4,12 @@
 
 #ifndef VL53L1X_H
 #define VL53L1X_H
+#include "esp_err.h"
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h> #include <string.h>
-#include <time.h>
+// #include <stdio.h>
+// #include <string.h>
+// #include <time.h>
 #include <unistd.h>
 
 typedef struct vl53l1x_s vl53l1x_t;
@@ -37,6 +39,37 @@ typedef enum {
   VL53L1X_RangeInvalid = 14,
   VL53L1X_None = 255,
 } vl53l1x_RangeStatus;
+
+struct vl53l1x_s {
+  uint8_t port;
+  uint8_t address;
+  int8_t xshut;
+  uint16_t io_timeout;
+  uint16_t fast_osc_frequency;
+  uint16_t osc_calibrate_val;
+  uint16_t timeout_start_ms;
+  esp_err_t err;
+  uint8_t io_2v8 : 1;
+  uint8_t did_timeout : 1;
+  uint8_t i2c_fail : 1;
+  uint8_t calibrated : 1;
+  uint8_t saved_vhv_init;
+  uint8_t saved_vhv_timeout;
+  struct RangingData {
+    uint16_t range_mm;
+    vl53l1x_RangeStatus range_status;
+    float peak_signal_count_rate_MCPS;
+    float ambient_count_rate_MCPS;
+  } ranging_data;
+  struct ResultBuffer {
+    uint8_t range_status;
+    uint8_t stream_count;
+    uint16_t dss_actual_effective_spads_sd0;
+    uint16_t ambient_count_rate_mcps_sd0;
+    uint16_t final_crosstalk_corrected_range_mm_sd0;
+    uint16_t peak_signal_count_rate_crosstalk_corrected_mcps_sd0;
+  } results;
+};
 
 vl53l1x_t *vl53l1x_config(int8_t port, int8_t scl, int8_t sda, int8_t xshut,
                           uint8_t address, uint8_t io_2v8);

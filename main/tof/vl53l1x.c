@@ -6,7 +6,6 @@
 static const char __attribute__((unused)) TAG[] = "ranger";
 
 #include "vl53l1x.h"
-#include "esp_log.h"
 #include "esp_timer.h"
 #include "string.h"
 #include <driver/i2c.h>
@@ -1215,37 +1214,6 @@ enum {
   SHADOW_RESULT_CORE__SPARE_0 = 0x0FFC,
   SHADOW_PHASECAL_RESULT__REFERENCE_PHASE_HI = 0x0FFE,
   SHADOW_PHASECAL_RESULT__REFERENCE_PHASE_LO = 0x0FFF,
-};
-
-struct vl53l1x_s {
-  uint8_t port;
-  uint8_t address;
-  int8_t xshut;
-  uint16_t io_timeout;
-  uint16_t fast_osc_frequency;
-  uint16_t osc_calibrate_val;
-  uint16_t timeout_start_ms;
-  esp_err_t err;
-  uint8_t io_2v8 : 1;
-  uint8_t did_timeout : 1;
-  uint8_t i2c_fail : 1;
-  uint8_t calibrated : 1;
-  uint8_t saved_vhv_init;
-  uint8_t saved_vhv_timeout;
-  struct RangingData {
-    uint16_t range_mm;
-    vl53l1x_RangeStatus range_status;
-    float peak_signal_count_rate_MCPS;
-    float ambient_count_rate_MCPS;
-  } ranging_data;
-  struct ResultBuffer {
-    uint8_t range_status;
-    uint8_t stream_count;
-    uint16_t dss_actual_effective_spads_sd0;
-    uint16_t ambient_count_rate_mcps_sd0;
-    uint16_t final_crosstalk_corrected_range_mm_sd0;
-    uint16_t peak_signal_count_rate_crosstalk_corrected_mcps_sd0;
-  } results;
 };
 
 typedef struct {
