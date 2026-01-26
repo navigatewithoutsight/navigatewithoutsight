@@ -22,4 +22,5 @@ int GY87_init_no_i2c_bus(void);
 void GY87_update_cadence_and_speed(float *cadence, float *speed,
                                    SemaphoreHandle_t mutex);
 
+void analize_gz(float *gz_arg, int *turn_direction_arg, int *turn_degree_arg);
 #endif

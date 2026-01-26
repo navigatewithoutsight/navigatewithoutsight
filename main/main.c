@@ -1,8 +1,3 @@
-// #include "esp_log.h"
-// #include "freertos/FreeRTOS.h"
-// #include "freertos/task.h"
-// #include "gy87.h"
-
 #include "sdkconfig.h"
 #include "stdio.h"
 #if CONFIG_VL53L7CX_ENABLE
@@ -13,6 +8,8 @@
 #endif
 #if CONFIG_MODULE_ALL
 #include "real_main.h"
+#elif CONFIG_IO_TEST
+#include "io_test.h"
 #endif
 
 void app_main() {
@@ -27,6 +24,9 @@ void app_main() {
 #elif CONFIG_MODULE_ALL
   printf("- All modules enabled\n");
   all_modules_main();
+#elif CONFIG_IO_TEST
+  printf("- IO_TEST\n");
+  io_test_start();
 #endif
 
 #if CONFIG_DEBUG_OUTPUT

@@ -9,6 +9,9 @@ menu "Module Configuration"
         config MODULE_GY87
             bool "GY87 Module (IMU)"
 
+        config IO_TEST
+            bool "Buzzers, buttons module test"
+
         config VL53L7CX_ENABLE
             bool "Enable VL53L7CX ToF sensor"
             default n

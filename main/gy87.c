@@ -126,6 +126,21 @@ int GY87_read_accel(float *ax, float *ay, float *az) {
   return 0;
 }
 
+/* ================= Interpret degres ================= */
+
+void analize_gz(float *gz_arg, int *turn_direction_arg, int *turn_degree_arg) {
+
+  float gz_value = *gz_arg;
+
+  if (gz_value > 20.0f)
+    *turn_direction_arg = 1;
+  else if (gz_value < -20.0f)
+    *turn_direction_arg = -1;
+  else
+    *turn_direction_arg = 0;
+  *turn_degree_arg = (int)gz_value;
+}
+
 /* ================= STEP DETECTION ================= */
 
 static bool detect_step(float ax, float ay, float az) {
@@ -154,9 +169,7 @@ void GY87_update_cadence_and_speed(float *cadence, float *speed,
       return;
 
     xSemaphoreGive(mutex);
-    // ESP_LOGI("GAIT", "Released lock");
   } else {
-    // ESP_LOGI("GAIT", "Can't aquire lock");
     return;
   }
   if (detect_step(ax, ay, az))
@@ -182,22 +195,7 @@ void GY87_update_cadence_and_speed(float *cadence, float *speed,
 
 void gy87_loop_iteration(float *cadence_arg, float *speed_arg, float *gz,
                          SemaphoreHandle_t mutex) {
-  if (GY87_read_gyro_z(gz, mutex) == 0) {
-    // turn_direction_t dir = GY87_detect_turn(*gz);
-    // ssd1306_clear();
-    //
-    // if (dir == TURN_LEFT) {
-    //   // ESP_LOGI(TAG, "Turning LEFT (%.2f °/s)", *gz);
-    //   ssd1306_draw_text_xy(20, 3, "LEFT");
-    // } else if (dir == TURN_RIGHT) {
-    //   // ESP_LOGI(TAG, "Turning RIGHT (%.2f °/s)", *gz);
-    //   ssd1306_draw_text_xy(20, 3, "RIGHT");
-    // } else {
-    //   // ESP_LOGI(TAG, "No turn (%.2f °/s)", *gz);
-    //   ssd1306_draw_text_xy(10, 3, "NO TURN");
-    // }
-  }
-
+  GY87_read_gyro_z(gz, mutex);
   GY87_update_cadence_and_speed(cadence_arg, speed_arg, mutex);
 }
 
